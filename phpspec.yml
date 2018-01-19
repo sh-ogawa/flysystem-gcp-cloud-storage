@@ -1,0 +1,16 @@
+---
+suites:
+      event_suite:
+        namespace: League\Flysystem\GcpCloudStorage
+        psr4_prefix: League\Flysystem\GcpCloudStorage
+extensions:
+  - PhpSpec\Extension\CodeCoverageExtension
+formatter.name: pretty
+code_coverage:
+  format:
+    - html
+    - text
+    - clover
+  output:
+    html: coverage
+    clover: coverage.xml

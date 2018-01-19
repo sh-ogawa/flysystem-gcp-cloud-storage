@@ -1,0 +1,36 @@
+{
+    "name": "sh-ogawa/flysystem-gcp-cloud-storage",
+    "description": "Flysystem adapter for the GCP Cloud Storage",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "sh-ogawa"
+        }
+    ],
+    "require": {
+        "php": ">=5.5.0",
+        "google/cloud-storage": "^1.3"
+    },
+    "require-dev": {
+        "phpspec/phpspec": "^2.0.0",
+        "henrikbjorn/phpspec-code-coverage" : "~1.0.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "League\\Flysystem\\GcpCloudStorage\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "League\\Flysystem\\GcpCloudStorage\\Stub\\": "stub"
+        }
+    },
+    "config": {
+        "bin-dir": "bin"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        }
+    }
+}
