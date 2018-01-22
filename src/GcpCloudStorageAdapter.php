@@ -8,6 +8,7 @@ use League\Flysystem\Adapter\CanOverwriteFiles;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
 use League\Flysystem\Util;
+use Psr\Http\Message\StreamInterface;
 
 class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFiles
 {
@@ -119,7 +120,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param string $contents
      * @param Config $config Config object
      *
-     * @return false|array false on failure file meta data on success
+     * @return bool
      */
     public function write($path, $contents, Config $config)
     {
@@ -180,9 +181,11 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param string $dirname
      *
      * @return bool
+     * @deprecated
      */
     public function deleteDir($dirname)
     {
+        // todo:no supported method
         try {
             $prefix = $this->applyPathPrefix($dirname) . '/';
             $this->gcpClient->deleteMatchingObjects($this->bucket, $prefix);
@@ -200,9 +203,11 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param Config $config
      *
      * @return bool|array
+     * @deprecated
      */
     public function createDir($dirname, Config $config)
     {
+        // todo:no supported method
         return $this->upload($dirname . '/', '', $config);
     }
 
@@ -212,9 +217,11 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param string $path
      *
      * @return bool
+     * @deprecated
      */
     public function has($path)
     {
+        // todo:no supported method
         $location = $this->applyPathPrefix($path);
 
         if ($this->gcpClient->doesObjectExist($this->bucket, $location, $this->options)) {
@@ -227,13 +234,13 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Read a file.
      *
-     * @param string $path
+     * @param string $objectName
      *
      * @return false|array
      */
-    public function read($path)
+    public function read($objectName)
     {
-        $response = $this->readObject($path);
+        $response = $this->readObject($objectName);
 
         if ($response !== false) {
             $response['contents'] = $response['contents']->getContents();
@@ -424,27 +431,15 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      *
      * @return array|bool
      */
-    protected function readObject($path)
+    protected function readObject($objectName)
     {
-        $options = [
-            'Bucket' => $this->bucket,
-            'Key' => $this->applyPathPrefix($path),
-        ];
+        $client = $this->getClient();
+        $bucket = $client->bucket($this->getBucket());
+        $object = $bucket->object($objectName);
+        $stream = $object->downloadAsStream();
 
-        if (isset($this->options['@http'])) {
-            $options['@http'] = $this->options['@http'];
-        }
-
-        $command = $this->gcpClient->getCommand('getObject', $options + $this->options);
-
-        try {
-            /** @var Result $response */
-            $response = $this->gcpClient->execute($command);
-        } catch (S3Exception $e) {
-            return false;
-        }
-
-        return $this->normalizeResponse($response->toArray(), $path);
+        //return $this->normalizeResponse($stream);
+        return false;
     }
 
     /**
@@ -547,7 +542,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param        $body
      * @param Config $config
      *
-     * @return array
+     * @return bool
      */
     protected function upload($path, $body, Config $config)
     {
@@ -567,9 +562,16 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
             unset($options['ContentLength']);
         }
 
-        $uploader = $this->gcpClient->signedUrlUploader($path, $body, $options);
+        //$uploader = $this->gcpClient->signedUrlUploader($path, $body, $options);
 
-        return $this->normalizeResponse($options, $key);
+        $client = $this->getClient();
+        $bucket = $client->bucket($this->getBucket());
+        $object = $bucket->upload($body, [
+            'name' => $path,
+        ]);
+
+        return true;
+        //return $this->normalizeResponse($options, $key);
     }
 
     /**
@@ -610,12 +612,12 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Normalize the object result array.
      *
-     * @param array $response
+     * @param StreamInterface $stream
      * @param string $path
      *
      * @return array
      */
-    protected function normalizeResponse(array $response, $path = null)
+    protected function normalizeResponse(StreamInterface $stream, $path = null)
     {
         $result = [
             'path' => $path ?: $this->removePathPrefix(
