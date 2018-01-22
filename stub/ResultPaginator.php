@@ -1,9 +1,8 @@
 <?php
 
-namespace League\Flysystem\AwsS3v3\Stub;
+namespace League\Flysystem\GcpCloudStorage\Stub;
 
 use GuzzleHttp\Promise;
-use Aws\Result;
 use GuzzleHttp\Promise\PromiseInterface;
 
 class ResultPaginator

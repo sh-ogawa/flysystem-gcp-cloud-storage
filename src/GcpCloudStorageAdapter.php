@@ -2,10 +2,7 @@
 
 namespace League\Flysystem\GcpCloudStorage;
 
-use Aws\Result;
-use Aws\S3\Exception\DeleteMultipleObjectsException;
-use Aws\S3\Exception\S3Exception;
-use Aws\S3\S3Client;
+use Google\Cloud\Storage\StorageClient;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Adapter\CanOverwriteFiles;
 use League\Flysystem\AdapterInterface;
@@ -51,13 +48,13 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         'ServerSideEncryption',
         'StorageClass',
         'Tagging',
-        'WebsiteRedirectLocation'
+        'WebsiteRedirectLocation',
     ];
 
     /**
-     * @var S3Client
+     * @var StorageClient
      */
-    protected $s3Client;
+    protected $gcpClient;
 
     /**
      * @var string
@@ -72,14 +69,14 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Constructor.
      *
-     * @param S3Client $client
-     * @param string   $bucket
-     * @param string   $prefix
-     * @param array    $options
+     * @param StorageClient $client
+     * @param string $bucket
+     * @param string $prefix
+     * @param array $options
      */
-    public function __construct(S3Client $client, $bucket, $prefix = '', array $options = [])
+    public function __construct(StorageClient $client, $bucket, $prefix = '', array $options = [])
     {
-        $this->s3Client = $client;
+        $this->gcpClient = $client;
         $this->bucket = $bucket;
         $this->setPathPrefix($prefix);
         $this->options = $options;
@@ -102,17 +99,17 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function setBucket($bucket)
     {
-        $this->bucket =  $bucket;
+        $this->bucket = $bucket;
     }
 
     /**
      * Get the S3Client instance.
      *
-     * @return S3Client
+     * @return StorageClient
      */
     public function getClient()
     {
-        return $this->s3Client;
+        return $this->gcpClient;
     }
 
     /**
@@ -153,7 +150,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function rename($path, $newpath)
     {
-        if ( ! $this->copy($path, $newpath)) {
+        if (!$this->copy($path, $newpath)) {
             return false;
         }
 
@@ -163,25 +160,18 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Delete a file.
      *
-     * @param string $path
+     * @param string $objectName
      *
      * @return bool
      */
-    public function delete($path)
+    public function delete($objectName)
     {
-        $location = $this->applyPathPrefix($path);
+        $client = $this->getClient();
+        $bucket = $client->bucket($this->getBucket());
+        $object = $bucket->object($objectName);
+        $object->delete();
 
-        $command = $this->s3Client->getCommand(
-            'deleteObject',
-            [
-                'Bucket' => $this->bucket,
-                'Key' => $location,
-            ]
-        );
-
-        $this->s3Client->execute($command);
-
-        return ! $this->has($path);
+        return true;
     }
 
     /**
@@ -195,7 +185,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     {
         try {
             $prefix = $this->applyPathPrefix($dirname) . '/';
-            $this->s3Client->deleteMatchingObjects($this->bucket, $prefix);
+            $this->gcpClient->deleteMatchingObjects($this->bucket, $prefix);
         } catch (DeleteMultipleObjectsException $exception) {
             return false;
         }
@@ -227,7 +217,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     {
         $location = $this->applyPathPrefix($path);
 
-        if ($this->s3Client->doesObjectExist($this->bucket, $location, $this->options)) {
+        if ($this->gcpClient->doesObjectExist($this->bucket, $location, $this->options)) {
             return true;
         }
 
@@ -256,7 +246,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * List contents of a directory.
      *
      * @param string $directory
-     * @param bool   $recursive
+     * @param bool $recursive
      *
      * @return array
      */
@@ -283,7 +273,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     protected function retrievePaginatedListing(array $options)
     {
-        $resultPaginator = $this->s3Client->getPaginator('ListObjects', $options);
+        $resultPaginator = $this->gcpClient->getPaginator('ListObjects', $options);
         $listing = [];
 
         foreach ($resultPaginator as $result) {
@@ -302,7 +292,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function getMetadata($path)
     {
-        $command = $this->s3Client->getCommand(
+        $command = $this->gcpClient->getCommand(
             'headObject',
             [
                 'Bucket' => $this->bucket,
@@ -312,7 +302,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
 
         /* @var Result $result */
         try {
-            $result = $this->s3Client->execute($command);
+            $result = $this->gcpClient->execute($command);
         } catch (S3Exception $exception) {
             $response = $exception->getResponse();
 
@@ -365,9 +355,9 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Write a new file using a stream.
      *
-     * @param string   $path
+     * @param string $path
      * @param resource $resource
-     * @param Config   $config Config object
+     * @param Config $config Config object
      *
      * @return array|false false on failure file meta data on success
      */
@@ -379,9 +369,9 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Update a file using a stream.
      *
-     * @param string   $path
+     * @param string $path
      * @param resource $resource
-     * @param Config   $config Config object
+     * @param Config $config Config object
      *
      * @return array|false false on failure file meta data on success
      */
@@ -393,29 +383,17 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Copy a file.
      *
-     * @param string $path
-     * @param string $newpath
+     * @param string $objectName
+     * @param string $newBucketName
      *
      * @return bool
      */
-    public function copy($path, $newpath)
+    public function copy($objectName, $newBucketName)
     {
-        $command = $this->s3Client->getCommand(
-            'copyObject',
-            [
-                'Bucket' => $this->bucket,
-                'Key' => $this->applyPathPrefix($newpath),
-                'CopySource' => urlencode($this->bucket . '/' . $this->applyPathPrefix($path)),
-                'ACL' => $this->getRawVisibility($path) === AdapterInterface::VISIBILITY_PUBLIC
-                    ? 'public-read' : 'private',
-            ] + $this->options
-        );
-
-        try {
-            $this->s3Client->execute($command);
-        } catch (S3Exception $e) {
-            return false;
-        }
+        $client = $this->getClient();
+        $bucket = $client->bucket($this->getBucket());
+        $object = $bucket->object($objectName);
+        $object->copy($newBucketName, ['name' => $newBucketName]);
 
         return true;
     }
@@ -457,11 +435,11 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
             $options['@http'] = $this->options['@http'];
         }
 
-        $command = $this->s3Client->getCommand('getObject', $options + $this->options);
+        $command = $this->gcpClient->getCommand('getObject', $options + $this->options);
 
         try {
             /** @var Result $response */
-            $response = $this->s3Client->execute($command);
+            $response = $this->gcpClient->execute($command);
         } catch (S3Exception $e) {
             return false;
         }
@@ -479,7 +457,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function setVisibility($path, $visibility)
     {
-        $command = $this->s3Client->getCommand(
+        $command = $this->gcpClient->getCommand(
             'putObjectAcl',
             [
                 'Bucket' => $this->bucket,
@@ -489,8 +467,9 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         );
 
         try {
-            $this->s3Client->execute($command);
-        } catch (S3Exception $exception) {
+            $this->gcpClient->execute($command);
+            // todo：例外クラスを具体的なクラスにする
+        } catch (\Exception $exception) {
             return false;
         }
 
@@ -536,7 +515,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     protected function getRawVisibility($path)
     {
-        $command = $this->s3Client->getCommand(
+        $command = $this->gcpClient->getCommand(
             'getObjectAcl',
             [
                 'Bucket' => $this->bucket,
@@ -544,7 +523,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
             ]
         );
 
-        $result = $this->s3Client->execute($command);
+        $result = $this->gcpClient->execute($command);
         $visibility = AdapterInterface::VISIBILITY_PRIVATE;
 
         foreach ($result->get('Grants') as $grant) {
@@ -576,11 +555,11 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         $options = $this->getOptionsFromConfig($config);
         $acl = array_key_exists('ACL', $options) ? $options['ACL'] : 'private';
 
-        if ( ! isset($options['ContentType'])) {
+        if (!isset($options['ContentType'])) {
             $options['ContentType'] = Util::guessMimeType($path, $body);
         }
 
-        if ( ! isset($options['ContentLength'])) {
+        if (!isset($options['ContentLength'])) {
             $options['ContentLength'] = is_string($body) ? Util::contentSize($body) : Util::getStreamSize($body);
         }
 
@@ -588,7 +567,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
             unset($options['ContentLength']);
         }
 
-        $this->s3Client->upload($this->bucket, $key, $body, $acl, ['params' => $options]);
+        $uploader = $this->gcpClient->signedUrlUploader($path, $body, $options);
 
         return $this->normalizeResponse($options, $key);
     }
@@ -619,7 +598,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         }
 
         foreach (static::$metaOptions as $option) {
-            if ( ! $config->has($option)) {
+            if (!$config->has($option)) {
                 continue;
             }
             $options[$option] = $config->get($option);
@@ -631,7 +610,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     /**
      * Normalize the object result array.
      *
-     * @param array  $response
+     * @param array $response
      * @param string $path
      *
      * @return array
@@ -668,7 +647,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     {
         // Maybe this isn't an actual key, but a prefix.
         // Do a prefix listing of objects to determine.
-        $command = $this->s3Client->getCommand(
+        $command = $this->gcpClient->getCommand(
             'listObjects',
             [
                 'Bucket' => $this->bucket,
@@ -678,10 +657,11 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         );
 
         try {
-            $result = $this->s3Client->execute($command);
+            $result = $this->gcpClient->execute($command);
 
             return $result['Contents'] || $result['CommonPrefixes'];
-        } catch (S3Exception $e) {
+            // todo:例外クラスを具体的なクラスにする
+        } catch (\Exception $e) {
             if ($e->getStatusCode() === 403) {
                 return false;
             }

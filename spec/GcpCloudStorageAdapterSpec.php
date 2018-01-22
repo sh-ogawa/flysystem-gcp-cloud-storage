@@ -6,25 +6,26 @@ use Aws\Command;
 use Aws\Result;
 use Aws\S3\Exception\DeleteMultipleObjectsException;
 use Aws\S3\Exception\S3Exception;
+use Google\Cloud\Storage\StorageClient;
 use GuzzleHttp\Psr7;
 use League\Flysystem\AdapterInterface;
-use League\Flysystem\AwsS3v3\AwsS3Adapter;
-use League\Flysystem\AwsS3v3\Stub\ResultPaginator;
+use League\Flysystem\GcpCloudStorage\ResultPaginator;
 use League\Flysystem\Config;
+use League\Flysystem\GcpCloudStorage\GcpCloudStorageAdapter;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
 class GcpCloudStorageAdapterSpec extends ObjectBehavior
 {
     /**
-     * @var \Aws\S3\S3Client
+     * @var StorageClient
      */
     private $client;
     private $bucket;
     const PATH_PREFIX = 'path-prefix';
 
     /**
-     * @param \Aws\S3\S3Client $client
+     * @param \Google\Cloud\Storage\StorageClient $client
      */
     public function let($client)
     {
@@ -51,7 +52,7 @@ class GcpCloudStorageAdapterSpec extends ObjectBehavior
 
     public function it_is_initializable()
     {
-        $this->shouldHaveType(AwsS3Adapter::class);
+        $this->shouldHaveType(GcpCloudStorageAdapter::class);
         $this->shouldHaveType(AdapterInterface::class);
     }
 
@@ -464,7 +465,7 @@ class GcpCloudStorageAdapterSpec extends ObjectBehavior
             ],
             'public' => [
                 'Grants' => [[
-                    'Grantee' => ['URI' => AwsS3Adapter::PUBLIC_GRANT_URI],
+                    'Grantee' => ['URI' => GcpCloudStorageAdapter::PUBLIC_GRANT_URI],
                     'Permission' => 'READ',
                 ]],
             ],
