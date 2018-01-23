@@ -88,7 +88,6 @@ class GcpCloudStorageAdapterTest extends TestCase
         $this->assertFalse($result);
     }
 
-
     /**
      * @dataProvider gcpProvider
      * @test
@@ -107,11 +106,39 @@ class GcpCloudStorageAdapterTest extends TestCase
      * @dataProvider gcpProvider
      * @test
      */
+    public function downloadFileAsStream(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
+        $response = $adapter->readStream('mugi.jpg');
+        $body = $response->getBody();
+        file_put_contents('test.jpg', $body->getContents());
+        $this->assertEquals(true, true);
+    }
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
     public function copyFile(string $projectId, string $keyFilePath, string $bucketName)
     {
         $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
         $result = $adapter->copy('mugi.jpg', 'mugi-copy.jpg');
+        $this->assertArrayHasKey('selfLink', $result);
+        $this->assertArrayHasKey('mediaLink', $result);
+        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi-copy.jpg', $result['selfLink']);
+    }
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
+    public function listObject(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
+        $result = $adapter->listContents('/');
         $this->assertArrayHasKey('selfLink', $result);
         $this->assertArrayHasKey('mediaLink', $result);
         $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi-copy.jpg', $result['selfLink']);
@@ -179,7 +206,6 @@ class GcpCloudStorageAdapterTest extends TestCase
     {
         return [
             // projectId, Service Key Path, Bucket Name
-            ['', '.\\config\\gcp\\XXXXX.json', ''],
         ];
     }
 

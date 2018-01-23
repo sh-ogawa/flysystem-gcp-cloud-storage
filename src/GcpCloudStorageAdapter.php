@@ -3,6 +3,7 @@
 namespace League\Flysystem\GcpCloudStorage;
 
 use Google\Cloud\Storage\StorageClient;
+use Google\Cloud\Storage\StorageObject;
 use GuzzleHttp\Psr7\Response;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Adapter\CanOverwriteFiles;
@@ -197,19 +198,42 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function listContents($directory = '', $recursive = false)
     {
-        $prefix = $this->applyPathPrefix(rtrim($directory, '/') . '/');
-        $options = ['Bucket' => $this->bucket, 'Prefix' => ltrim($prefix, '/')];
-
-        if ($recursive === false) {
-            $options['Delimiter'] = '/';
+        $directory = $this->applyPathPrefix($directory);
+        $client = $this->getClient();
+        $bucket = $client->bucket($this->getBucket());
+        $objects = $bucket->objects(['prefix' => $directory]);
+        $normalised = [];
+        foreach ($objects as $object) {
+            $normalised[] = $this->normaliseObject($object);
         }
-
-        $listing = $this->retrievePaginatedListing($options);
-        $normalizer = [$this, 'normalizeResponse'];
-        $normalized = array_map($normalizer, $listing);
-
-        return Util::emulateDirectories($normalized);
+        return Util::emulateDirectories($normalised);
     }
+
+    /**
+     * Returns a dictionary of object metadata from an object.
+     *
+     * @param StorageObject $object
+     *
+     * @return array
+     */
+    protected function normaliseObject(StorageObject $object)
+    {
+        $name = $this->removePathPrefix($object->name());
+        $info = $object->info();
+        $isDir = substr($name, -1) === '/';
+        if ($isDir) {
+            $name = rtrim($name, '/');
+        }
+        return [
+            'type' => $isDir ? 'dir' : 'file',
+            'dirname' => Util::dirname($name),
+            'path' => $name,
+            'timestamp' => strtotime($info['updated']),
+            'mime-type' => $info['contentType'] ?? '',
+            'size' => $info['size'],
+        ];
+    }
+
 
     /**
      * @param array $options
@@ -359,14 +383,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function readStream($path)
     {
-        $response = $this->readObject($path);
-
-        if ($response !== false) {
-            $response['stream'] = $response['contents']->detach();
-            unset($response['contents']);
-        }
-
-        return $response;
+        return $this->readObject($path);;
     }
 
     /**
