@@ -13,46 +13,6 @@ use Psr\Http\Message\StreamInterface;
 
 class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFiles
 {
-    const PUBLIC_GRANT_URI = 'http://acs.amazonaws.com/groups/global/AllUsers';
-
-    /**
-     * @var array
-     */
-    protected static $resultMap = [
-        'Body' => 'contents',
-        'ContentLength' => 'size',
-        'ContentType' => 'mimetype',
-        'Size' => 'size',
-        'Metadata' => 'metadata',
-    ];
-
-    /**
-     * @var array
-     */
-    protected static $metaOptions = [
-        'ACL',
-        'CacheControl',
-        'ContentDisposition',
-        'ContentEncoding',
-        'ContentLength',
-        'ContentType',
-        'Expires',
-        'GrantFullControl',
-        'GrantRead',
-        'GrantReadACP',
-        'GrantWriteACP',
-        'Metadata',
-        'RequestPayer',
-        'SSECustomerAlgorithm',
-        'SSECustomerKey',
-        'SSECustomerKeyMD5',
-        'SSEKMSKeyId',
-        'ServerSideEncryption',
-        'StorageClass',
-        'Tagging',
-        'WebsiteRedirectLocation',
-    ];
-
     /**
      * @var StorageClient
      */
@@ -92,16 +52,6 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     public function getBucket()
     {
         return $this->bucket;
-    }
-
-    /**
-     * Set the S3Client bucket.
-     *
-     * @return string
-     */
-    public function setBucket($bucket)
-    {
-        $this->bucket = $bucket;
     }
 
     /**
@@ -185,18 +135,10 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param string $dirname
      *
      * @return bool
-     * @deprecated
      */
     public function deleteDir($dirname)
     {
-        // todo:no supported method
-        try {
-            $prefix = $this->applyPathPrefix($dirname) . '/';
-            $this->gcpClient->deleteMatchingObjects($this->bucket, $prefix);
-        } catch (DeleteMultipleObjectsException $exception) {
-            return false;
-        }
-
+        $this->delete($dirname . '/');
         return true;
     }
 
@@ -207,11 +149,10 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param Config $config
      *
      * @return bool|array
-     * @deprecated
+     * @throws \InvalidArgumentException
      */
     public function createDir($dirname, Config $config)
     {
-        // todo:no supported method
         return $this->upload($dirname . '/', '', $config);
     }
 

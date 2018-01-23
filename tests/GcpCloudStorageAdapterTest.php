@@ -92,6 +92,27 @@ class GcpCloudStorageAdapterTest extends TestCase
      * @dataProvider gcpProvider
      * @test
      */
+    public function createDir(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $storage = new StorageClient([
+            'projectId' => $projectId,
+            'keyFilePath' => $keyFilePath,
+        ]);
+
+        $config = new Config();
+        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $result = $adapter->createDir('new_dir', $config);
+
+        $this->assertArrayHasKey('selfLink', $result);
+        $this->assertArrayHasKey('mediaLink', $result);
+        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/new_dir%2F', $result['selfLink']);
+    }
+
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
     public function deleteFile(string $projectId, string $keyFilePath, string $bucketName)
     {
         $storage = new StorageClient([
@@ -104,13 +125,28 @@ class GcpCloudStorageAdapterTest extends TestCase
     }
 
     /**
+     * @dataProvider gcpProvider
+     * @test
+     */
+    public function deleteDir(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $storage = new StorageClient([
+            'projectId' => $projectId,
+            'keyFilePath' => $keyFilePath,
+        ]);
+        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $result = $adapter->deleteDir('new_dir');
+        $this->assertTrue($result);
+    }
+
+    /**
      * GCPのプロバイダ
      */
     public function gcpProvider()
     {
         return [
             // projectId, Service Key Path, Bucket Name
-            ['solid-topic-176300', '..\\config\\gcp\\cloud_storage-service-c7b14486b131.json', 'solid-topic-176300-bucket'],
+            ['solid-topic-176300', '.\\config\\gcp\\cloud_storage-service-c7b14486b131.json', 'solid-topic-176300-bucket'],
         ];
     }
 }
