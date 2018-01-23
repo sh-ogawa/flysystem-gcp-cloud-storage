@@ -3,6 +3,7 @@
 namespace League\Flysystem\GcpCloudStorage;
 
 use Google\Cloud\Storage\StorageClient;
+use GuzzleHttp\Psr7\Response;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Adapter\CanOverwriteFiles;
 use League\Flysystem\AdapterInterface;
@@ -120,11 +121,16 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param string $contents
      * @param Config $config Config object
      *
-     * @return bool
+     * @return array|false
      */
     public function write($path, $contents, Config $config)
     {
-        return $this->upload($path, $contents, $config);
+        try {
+            return $this->upload($path, $contents, $config);
+        } catch (\InvalidArgumentException $e) {
+            error_log($e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -236,17 +242,11 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      *
      * @param string $objectName
      *
-     * @return false|array
+     * @return Response
      */
     public function read($objectName)
     {
-        $response = $this->readObject($objectName);
-
-        if ($response !== false) {
-            $response['contents'] = $response['contents']->getContents();
-        }
-
-        return $response;
+        return $this->readObject($objectName);
     }
 
     /**
@@ -391,18 +391,25 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * Copy a file.
      *
      * @param string $objectName
-     * @param string $newBucketName
+     * @param string $newObjectName
      *
-     * @return bool
+     * @return array
      */
-    public function copy($objectName, $newBucketName)
+    public function copy($objectName, $newObjectName)
     {
+        //@todo: Copy across buckets
+
         $client = $this->getClient();
         $bucket = $client->bucket($this->getBucket());
         $object = $bucket->object($objectName);
-        $object->copy($newBucketName, ['name' => $newBucketName]);
+        $copyObject = $object->copy($this->getBucket(), ['name' => $newObjectName]);
+        $info = $copyObject->info();
+        $result = [
+            'selfLink' => $info['selfLink'],
+            'mediaLink' => $info['mediaLink'],
+        ];
 
-        return true;
+        return $result;
     }
 
     /**
@@ -410,7 +417,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      *
      * @param string $path
      *
-     * @return array|false
+     * @return Response
      */
     public function readStream($path)
     {
@@ -429,7 +436,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      *
      * @param $path
      *
-     * @return array|bool
+     * @return Response
      */
     protected function readObject($objectName)
     {
@@ -438,8 +445,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         $object = $bucket->object($objectName);
         $stream = $object->downloadAsStream();
 
-        //return $this->normalizeResponse($stream);
-        return false;
+        return $this->normalizeResponse($stream);
     }
 
     /**
@@ -542,36 +548,23 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param        $body
      * @param Config $config
      *
-     * @return bool
+     * @return array
+     * @throws \InvalidArgumentException
      */
     protected function upload($path, $body, Config $config)
     {
-        $key = $this->applyPathPrefix($path);
-        $options = $this->getOptionsFromConfig($config);
-        $acl = array_key_exists('ACL', $options) ? $options['ACL'] : 'private';
-
-        if (!isset($options['ContentType'])) {
-            $options['ContentType'] = Util::guessMimeType($path, $body);
-        }
-
-        if (!isset($options['ContentLength'])) {
-            $options['ContentLength'] = is_string($body) ? Util::contentSize($body) : Util::getStreamSize($body);
-        }
-
-        if ($options['ContentLength'] === null) {
-            unset($options['ContentLength']);
-        }
-
-        //$uploader = $this->gcpClient->signedUrlUploader($path, $body, $options);
-
         $client = $this->getClient();
         $bucket = $client->bucket($this->getBucket());
         $object = $bucket->upload($body, [
             'name' => $path,
         ]);
+        $info = $object->info();
+        $result = [
+            'selfLink' => $info['selfLink'],
+            'mediaLink' => $info['mediaLink'],
+        ];
 
-        return true;
-        //return $this->normalizeResponse($options, $key);
+        return $result;
     }
 
     /**
@@ -615,29 +608,12 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param StreamInterface $stream
      * @param string $path
      *
-     * @return array
+     * @return Response
      */
     protected function normalizeResponse(StreamInterface $stream, $path = null)
     {
-        $result = [
-            'path' => $path ?: $this->removePathPrefix(
-                isset($response['Key']) ? $response['Key'] : $response['Prefix']
-            ),
-        ];
-        $result = array_merge($result, Util::pathinfo($result['path']));
-
-        if (isset($response['LastModified'])) {
-            $result['timestamp'] = strtotime($response['LastModified']);
-        }
-
-        if (substr($result['path'], -1) === '/') {
-            $result['type'] = 'dir';
-            $result['path'] = rtrim($result['path'], '/');
-
-            return $result;
-        }
-
-        return array_merge($result, Util::map($response, static::$resultMap), ['type' => 'file']);
+        $response = new Response();
+        return $response->withBody($stream);
     }
 
     /**
