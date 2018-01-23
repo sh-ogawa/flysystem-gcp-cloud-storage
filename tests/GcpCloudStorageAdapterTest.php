@@ -72,13 +72,45 @@ class GcpCloudStorageAdapterTest extends TestCase
     }
 
     /**
+     * @dataProvider gcpProvider
+     * @test
+     */
+    public function renameFile(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $storage = new StorageClient([
+            'projectId' => $projectId,
+            'keyFilePath' => $keyFilePath,
+        ]);
+        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $result = $adapter->rename('mugi.jpg', 'mugi-rename.jpg');
+        $this->assertArrayHasKey('selfLink', $result);
+        $this->assertArrayHasKey('mediaLink', $result);
+        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi-rename.jpg', $result['selfLink']);
+    }
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
+    public function deleteFile(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $storage = new StorageClient([
+            'projectId' => $projectId,
+            'keyFilePath' => $keyFilePath,
+        ]);
+        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $result = $adapter->delete('mugi-rename.jpg');
+        $this->assertTrue($result);
+    }
+
+    /**
      * GCPのプロバイダ
      */
     public function gcpProvider()
     {
         return [
             // projectId, Service Key Path, Bucket Name
-            ['', '..\\config\\gcp\\xxxxxx.json', ''],
+            ['solid-topic-176300', '..\\config\\gcp\\cloud_storage-service-c7b14486b131.json', 'solid-topic-176300-bucket'],
         ];
     }
 }

@@ -153,15 +153,13 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param string $path
      * @param string $newpath
      *
-     * @return bool
+     * @return array
      */
     public function rename($path, $newpath)
     {
-        if (!$this->copy($path, $newpath)) {
-            return false;
-        }
-
-        return $this->delete($path);
+        $result = $this->copy($path, $newpath);
+        $this->delete($path);
+        return $result;
     }
 
     /**
