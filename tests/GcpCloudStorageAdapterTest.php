@@ -21,13 +21,9 @@ class GcpCloudStorageAdapterTest extends TestCase
      */
     public function uploadFile(string $projectId, string $keyFilePath, string $bucketName)
     {
-        $storage = new StorageClient([
-            'projectId' => $projectId,
-            'keyFilePath' => $keyFilePath,
-        ]);
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
         $config = new Config();
-        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
         $file = fopen(__DIR__ . "\\my_rabbit.jpg", 'r');
         $result = $adapter->write('mugi.jpg', $file, $config);
 
@@ -40,14 +36,67 @@ class GcpCloudStorageAdapterTest extends TestCase
      * @dataProvider gcpProvider
      * @test
      */
+    public function uploadSameFile(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
+        $config = new Config();
+        $file = fopen(__DIR__ . "\\my_rabbit.jpg", 'r');
+        $result = $adapter->write('mugi.jpg', $file, $config);
+        $this->assertFalse($result);
+    }
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
+    public function updateFile(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
+        $config = new Config();
+        $file = fopen(__DIR__ . "\\my_rabbit.jpg", 'r');
+        $result = $adapter->update('mugi.jpg', $file, $config);
+
+        $this->assertArrayHasKey('selfLink', $result);
+        $this->assertArrayHasKey('mediaLink', $result);
+        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi.jpg', $result['selfLink']);
+    }
+
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
+    public function hasFile(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
+        $result = $adapter->has('mugi.jpg');
+        $this->assertTrue($result);
+    }
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
+    public function notHasFile(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
+        $result = $adapter->has('mugi1.jpg');
+        $this->assertFalse($result);
+    }
+
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
     public function downloadFile(string $projectId, string $keyFilePath, string $bucketName)
     {
-        $storage = new StorageClient([
-            'projectId' => $projectId,
-            'keyFilePath' => $keyFilePath,
-        ]);
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
-        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
         $response = $adapter->read('mugi.jpg');
         $body = $response->getBody();
         file_put_contents('test.jpg', $body->getContents());
@@ -60,11 +109,8 @@ class GcpCloudStorageAdapterTest extends TestCase
      */
     public function copyFile(string $projectId, string $keyFilePath, string $bucketName)
     {
-        $storage = new StorageClient([
-            'projectId' => $projectId,
-            'keyFilePath' => $keyFilePath,
-        ]);
-        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
         $result = $adapter->copy('mugi.jpg', 'mugi-copy.jpg');
         $this->assertArrayHasKey('selfLink', $result);
         $this->assertArrayHasKey('mediaLink', $result);
@@ -77,11 +123,8 @@ class GcpCloudStorageAdapterTest extends TestCase
      */
     public function renameFile(string $projectId, string $keyFilePath, string $bucketName)
     {
-        $storage = new StorageClient([
-            'projectId' => $projectId,
-            'keyFilePath' => $keyFilePath,
-        ]);
-        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
         $result = $adapter->rename('mugi.jpg', 'mugi-rename.jpg');
         $this->assertArrayHasKey('selfLink', $result);
         $this->assertArrayHasKey('mediaLink', $result);
@@ -94,13 +137,9 @@ class GcpCloudStorageAdapterTest extends TestCase
      */
     public function createDir(string $projectId, string $keyFilePath, string $bucketName)
     {
-        $storage = new StorageClient([
-            'projectId' => $projectId,
-            'keyFilePath' => $keyFilePath,
-        ]);
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
         $config = new Config();
-        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
         $result = $adapter->createDir('new_dir', $config);
 
         $this->assertArrayHasKey('selfLink', $result);
@@ -115,11 +154,8 @@ class GcpCloudStorageAdapterTest extends TestCase
      */
     public function deleteFile(string $projectId, string $keyFilePath, string $bucketName)
     {
-        $storage = new StorageClient([
-            'projectId' => $projectId,
-            'keyFilePath' => $keyFilePath,
-        ]);
-        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
         $result = $adapter->delete('mugi-rename.jpg');
         $this->assertTrue($result);
     }
@@ -130,11 +166,8 @@ class GcpCloudStorageAdapterTest extends TestCase
      */
     public function deleteDir(string $projectId, string $keyFilePath, string $bucketName)
     {
-        $storage = new StorageClient([
-            'projectId' => $projectId,
-            'keyFilePath' => $keyFilePath,
-        ]);
-        $adapter = new GcpCloudStorageAdapter($storage, $bucketName);
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
         $result = $adapter->deleteDir('new_dir');
         $this->assertTrue($result);
     }
@@ -146,7 +179,23 @@ class GcpCloudStorageAdapterTest extends TestCase
     {
         return [
             // projectId, Service Key Path, Bucket Name
-            ['solid-topic-176300', '.\\config\\gcp\\cloud_storage-service-c7b14486b131.json', 'solid-topic-176300-bucket'],
+            ['', '.\\config\\gcp\\XXXXX.json', ''],
         ];
+    }
+
+    /**
+     * create Adapter
+     * @param string $projectId
+     * @param string $keyFilePath
+     * @param string $bucketName
+     * @return GcpCloudStorageAdapter
+     */
+    private function createAdapter(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $storage = new StorageClient([
+            'projectId' => $projectId,
+            'keyFilePath' => $keyFilePath,
+        ]);
+        return new GcpCloudStorageAdapter($storage, $bucketName);
     }
 }

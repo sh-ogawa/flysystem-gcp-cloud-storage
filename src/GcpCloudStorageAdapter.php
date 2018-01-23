@@ -76,11 +76,13 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     public function write($path, $contents, Config $config)
     {
         try {
-            return $this->upload($path, $contents, $config);
+            if(!$this->has($path)){
+                return $this->upload($path, $contents, $config);
+            }
         } catch (\InvalidArgumentException $e) {
             error_log($e->getMessage());
-            return false;
         }
+        return false;
     }
 
     /**
@@ -162,18 +164,15 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      * @param string $path
      *
      * @return bool
-     * @deprecated
      */
     public function has($path)
     {
-        // todo:no supported method
-        $location = $this->applyPathPrefix($path);
 
-        if ($this->gcpClient->doesObjectExist($this->bucket, $location, $this->options)) {
-            return true;
-        }
+        $client = $this->getClient();
+        $bucket = $client->bucket($this->getBucket());
+        $object = $bucket->object($path);
 
-        return $this->doesDirectoryExist($location);
+        return $object->exists();
     }
 
     /**
