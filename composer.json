@@ -7,7 +7,6 @@
             "email": "syogo0417@gmail.com"
         }
     ],
-    "minimum-stability": "dev",
     "require": {
         "php": ">=7.0.0",
         "google/cloud-storage": "^1.3",
