@@ -92,6 +92,20 @@ class GcpCloudStorageAdapterTest extends TestCase
      * @dataProvider gcpProvider
      * @test
      */
+    public function setVisibility(string $projectId, string $keyFilePath, string $bucketName)
+    {
+        $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
+
+        $result = $adapter->setVisibility('mugi.jpg', 'public');
+
+        $result = $adapter->setVisibility('mugi.jpg', 'private');
+        $this->assertTrue($result);
+    }
+
+    /**
+     * @dataProvider gcpProvider
+     * @test
+     */
     public function downloadFile(string $projectId, string $keyFilePath, string $bucketName)
     {
         $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
@@ -124,7 +138,7 @@ class GcpCloudStorageAdapterTest extends TestCase
     {
         $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
-        $result = $adapter->copy('mugi.jpg', 'mugi-copy.jpg');
+        $result = $adapter->copy('mugi.jpg', 'mugi-copy1.jpg');
         $this->assertArrayHasKey('selfLink', $result);
         $this->assertArrayHasKey('mediaLink', $result);
         $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi-copy.jpg', $result['selfLink']);
@@ -168,7 +182,6 @@ class GcpCloudStorageAdapterTest extends TestCase
 
         $config = new Config();
         $result = $adapter->createDir('new_dir', $config);
-
         $this->assertArrayHasKey('selfLink', $result);
         $this->assertArrayHasKey('mediaLink', $result);
         $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/new_dir%2F', $result['selfLink']);

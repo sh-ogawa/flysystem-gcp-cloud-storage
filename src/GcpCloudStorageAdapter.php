@@ -77,12 +77,13 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     public function write($path, $contents, Config $config)
     {
         try {
-            if(!$this->has($path)){
+            if (!$this->has($path)) {
                 return $this->upload($path, $contents, $config);
             }
         } catch (\InvalidArgumentException $e) {
             error_log($e->getMessage());
         }
+
         return false;
     }
 
@@ -112,6 +113,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     {
         $result = $this->copy($path, $newpath);
         $this->delete($path);
+
         return $result;
     }
 
@@ -142,6 +144,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     public function deleteDir($dirname)
     {
         $this->delete($dirname . '/');
+
         return true;
     }
 
@@ -206,6 +209,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         foreach ($objects as $object) {
             $normalised[] = $this->normaliseObject($object);
         }
+
         return Util::emulateDirectories($normalised);
     }
 
@@ -224,6 +228,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         if ($isDir) {
             $name = rtrim($name, '/');
         }
+
         return [
             'type' => $isDir ? 'dir' : 'file',
             'dirname' => Util::dirname($name),
@@ -383,7 +388,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function readStream($path)
     {
-        return $this->readObject($path);;
+        return $this->readObject($path);
     }
 
     /**
@@ -404,32 +409,23 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     }
 
     /**
-     * Set the visibility for a file.
-     *
-     * @param string $path
-     * @param string $visibility
-     *
-     * @return array|false file meta data
+     * @inheritdoc
+     * @throws \InvalidArgumentException
      */
     public function setVisibility($path, $visibility)
     {
-        $command = $this->gcpClient->getCommand(
-            'putObjectAcl',
-            [
-                'Bucket' => $this->bucket,
-                'Key' => $this->applyPathPrefix($path),
-                'ACL' => $visibility === AdapterInterface::VISIBILITY_PUBLIC ? 'public-read' : 'private',
-            ]
-        );
-
-        try {
-            $this->gcpClient->execute($command);
-            // todo：例外クラスを具体的なクラスにする
-        } catch (\Exception $exception) {
-            return false;
+        $client = $this->getClient();
+        $bucket = $client->bucket($this->getBucket());
+        $object = $bucket->object($path);
+        if ($visibility === 'public') {
+            $info = $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
+        } else if($visibility === 'private') {
+            $info = $object->update(['acl' => []], ['predefinedAcl' => 'private']);
+        } else {
+            throw new \InvalidArgumentException("Set visibility 'public' or 'private'");
         }
 
-        return compact('path', 'visibility');
+        return [];
     }
 
     /**
@@ -441,7 +437,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     public function getVisibility($path)
     {
-        return ['visibility' => $this->getRawVisibility($path)];
+        return false;
     }
 
     /**
@@ -568,6 +564,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
     protected function normalizeResponse(StreamInterface $stream, $path = null)
     {
         $response = new Response();
+
         return $response->withBody($stream);
     }
 
