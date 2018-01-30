@@ -210,7 +210,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
             $normalised[] = $this->normaliseObject($object);
         }
 
-        return Util::emulateDirectories($normalised);
+        return $normalised;
     }
 
     /**
@@ -222,21 +222,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
      */
     protected function normaliseObject(StorageObject $object)
     {
-        $name = $this->removePathPrefix($object->name());
-        $info = $object->info();
-        $isDir = substr($name, -1) === '/';
-        if ($isDir) {
-            $name = rtrim($name, '/');
-        }
-
-        return [
-            'type' => $isDir ? 'dir' : 'file',
-            'dirname' => Util::dirname($name),
-            'path' => $name,
-            'timestamp' => strtotime($info['updated']),
-            'mime-type' => $info['contentType'] ?? '',
-            'size' => $info['size'],
-        ];
+        return $object->info();
     }
 
 
@@ -370,13 +356,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         $bucket = $client->bucket($this->getBucket());
         $object = $bucket->object($objectName);
         $copyObject = $object->copy($this->getBucket(), ['name' => $newObjectName]);
-        $info = $copyObject->info();
-        $result = [
-            'selfLink' => $info['selfLink'],
-            'mediaLink' => $info['mediaLink'],
-        ];
-
-        return $result;
+        return $copyObject->info();;
     }
 
     /**
@@ -425,7 +405,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
             throw new \InvalidArgumentException("Set visibility 'public' or 'private'");
         }
 
-        return [];
+        return $info;
     }
 
     /**
@@ -509,13 +489,7 @@ class GcpCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFile
         $object = $bucket->upload($body, [
             'name' => $path,
         ]);
-        $info = $object->info();
-        $result = [
-            'selfLink' => $info['selfLink'],
-            'mediaLink' => $info['mediaLink'],
-        ];
-
-        return $result;
+        return $object->info();;
     }
 
     /**

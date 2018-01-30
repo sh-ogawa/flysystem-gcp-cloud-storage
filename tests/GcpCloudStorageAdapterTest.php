@@ -15,6 +15,68 @@ class GcpCloudStorageAdapterTest extends TestCase
     private $bucket;
     const PATH_PREFIX = 'path-prefix';
 
+    const OBJECT_UPLOAD_INFO = [
+        'kind',
+        'id',
+        'selfLink',
+        'name',
+        'bucket',
+        'generation',
+        'metageneration',
+        'contentType',
+        'timeCreated',
+        'updated',
+        'storageClass',
+        'timeStorageClassUpdated',
+        'size',
+        'md5Hash',
+        'mediaLink',
+        'crc32c',
+        'etag',
+    ];
+
+    const OBJECT_LIST_INFO = [
+        'kind',
+        'id',
+        'selfLink',
+        'name',
+        'bucket',
+        'generation',
+        'metageneration',
+        'contentType',
+        'timeCreated',
+        'updated',
+        'storageClass',
+        'timeStorageClassUpdated',
+        'size',
+        'md5Hash',
+        'mediaLink',
+        'crc32c',
+        'etag',
+    ];
+
+    const OBJECT_INFO = [
+        'kind',
+        'id',
+        'selfLink',
+        'name',
+        'bucket',
+        'generation',
+        'metageneration',
+        'contentType',
+        'timeCreated',
+        'updated',
+        'storageClass',
+        'timeStorageClassUpdated',
+        'size',
+        'md5Hash',
+        'mediaLink',
+        'acl',
+        'owner',
+        'crc32c',
+        'etag',
+    ];
+
     /**
      * @dataProvider gcpProvider
      * @test
@@ -26,10 +88,9 @@ class GcpCloudStorageAdapterTest extends TestCase
         $config = new Config();
         $file = fopen(__DIR__ . "\\my_rabbit.jpg", 'r');
         $result = $adapter->write('mugi.jpg', $file, $config);
-
-        $this->assertArrayHasKey('selfLink', $result);
-        $this->assertArrayHasKey('mediaLink', $result);
-        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi.jpg', $result['selfLink']);
+        foreach(self::OBJECT_UPLOAD_INFO as $info) {
+            $this->assertArrayHasKey($info, $result);
+        }
     }
 
     /**
@@ -57,10 +118,9 @@ class GcpCloudStorageAdapterTest extends TestCase
         $config = new Config();
         $file = fopen(__DIR__ . "\\my_rabbit.jpg", 'r');
         $result = $adapter->update('mugi.jpg', $file, $config);
-
-        $this->assertArrayHasKey('selfLink', $result);
-        $this->assertArrayHasKey('mediaLink', $result);
-        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi.jpg', $result['selfLink']);
+        foreach(self::OBJECT_UPLOAD_INFO as $info) {
+            $this->assertArrayHasKey($info, $result);
+        }
     }
 
 
@@ -97,9 +157,14 @@ class GcpCloudStorageAdapterTest extends TestCase
         $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
         $result = $adapter->setVisibility('mugi.jpg', 'public');
+        foreach(self::OBJECT_INFO as $info) {
+            $this->assertArrayHasKey($info, $result);
+        }
 
         $result = $adapter->setVisibility('mugi.jpg', 'private');
-        $this->assertTrue($result);
+        foreach(self::OBJECT_INFO as $info) {
+            $this->assertArrayHasKey($info, $result);
+        }
     }
 
     /**
@@ -138,10 +203,10 @@ class GcpCloudStorageAdapterTest extends TestCase
     {
         $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
-        $result = $adapter->copy('mugi.jpg', 'mugi-copy1.jpg');
-        $this->assertArrayHasKey('selfLink', $result);
-        $this->assertArrayHasKey('mediaLink', $result);
-        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi-copy.jpg', $result['selfLink']);
+        $result = $adapter->copy('mugi.jpg', 'mugi-copy.jpg');
+        foreach(self::OBJECT_UPLOAD_INFO as $info) {
+            $this->assertArrayHasKey($info, $result);
+        }
     }
 
     /**
@@ -153,9 +218,12 @@ class GcpCloudStorageAdapterTest extends TestCase
         $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
         $result = $adapter->listContents('/');
-        $this->assertArrayHasKey('selfLink', $result);
-        $this->assertArrayHasKey('mediaLink', $result);
-        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi-copy.jpg', $result['selfLink']);
+        foreach($result as $element) {
+            foreach(self::OBJECT_LIST_INFO as $info) {
+                $this->assertArrayHasKey($info, $element);
+            }
+        }
+
     }
 
     /**
@@ -167,9 +235,9 @@ class GcpCloudStorageAdapterTest extends TestCase
         $adapter = $this->createAdapter($projectId, $keyFilePath, $bucketName);
 
         $result = $adapter->rename('mugi.jpg', 'mugi-rename.jpg');
-        $this->assertArrayHasKey('selfLink', $result);
-        $this->assertArrayHasKey('mediaLink', $result);
-        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/mugi-rename.jpg', $result['selfLink']);
+        foreach(self::OBJECT_UPLOAD_INFO as $info) {
+            $this->assertArrayHasKey($info, $result);
+        }
     }
 
     /**
@@ -182,9 +250,9 @@ class GcpCloudStorageAdapterTest extends TestCase
 
         $config = new Config();
         $result = $adapter->createDir('new_dir', $config);
-        $this->assertArrayHasKey('selfLink', $result);
-        $this->assertArrayHasKey('mediaLink', $result);
-        $this->assertEquals('https://www.googleapis.com/storage/v1/b/solid-topic-176300-bucket/o/new_dir%2F', $result['selfLink']);
+        foreach(self::OBJECT_UPLOAD_INFO as $info) {
+            $this->assertArrayHasKey($info, $result);
+        }
     }
 
 
